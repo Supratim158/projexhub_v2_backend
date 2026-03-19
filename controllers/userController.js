@@ -1,4 +1,5 @@
 const User = require('../models/userModel');
+const jwt = require('jsonwebtoken');
 
 module.exports = {
     getUser: async (req, res) => {
@@ -29,9 +30,16 @@ module.exports = {
 
                 await user.save();
 
+                const userToken = jwt.sign({
+                                id: user._id,
+                                userType: user.userType,
+                                email: user.email,
+                            },
+                            process.env.JWT_SECRET, {expiresIn: "21d"});
+
                 const {password,  __v, otp, createdAt, ...others} = user._doc;
 
-                return res.status(200).json(others);
+                res.status(200).json({...others, userToken});
             }
             else{
                 res.status(400).json({status: false, message: "Otp verification failed"});
