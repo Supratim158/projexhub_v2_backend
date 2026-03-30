@@ -1,14 +1,22 @@
-const sgMail = require('@sendgrid/mail');
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const nodemailer = require('nodemailer');
 
 async function sendEmail(userEmail, message) {
     try {
-        console.log("Sending email via SendGrid to:", userEmail);
+        console.log("Sending email via Brevo to:", userEmail);
 
-        const msg = {
+        const transporter = nodemailer.createTransport({
+            host: 'smtp-relay.brevo.com',
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.BREVO_USER,      // usually your email
+                pass: process.env.BREVO_API_KEY   // Brevo SMTP key
+            }
+        });
+
+        const mailOptions = {
+            from: `"ProjexHub" <${process.env.VERIFIED_GMAIL}>`, // must be verified in Brevo
             to: userEmail,
-            from: process.env.VERIFIED_GMAIL,
             subject: 'ProjexHub Verification Code',
             html: `
                 <h1>ProjexHub Verification Code</h1>
@@ -16,13 +24,13 @@ async function sendEmail(userEmail, message) {
             `
         };
 
-        const response = await sgMail.send(msg);
+        const info = await transporter.sendMail(mailOptions);
 
-        console.log("Email sent ✅", response[0].statusCode);
-        return { success: true, response };
+        console.log("Email sent ✅", info.messageId);
+        return { success: true, info };
 
     } catch (error) {
-        console.error("SendGrid Error ❌:", error.response?.body || error.message);
+        console.error("Brevo Error ❌:", error.message);
         return { success: false, error };
     }
 }
