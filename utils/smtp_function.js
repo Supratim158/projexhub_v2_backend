@@ -1,37 +1,38 @@
-const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 async function sendEmail(userEmail, message) {
     try {
-        console.log("Sending email via Brevo to:", userEmail);
+        console.log("Sending email via Brevo API...");
 
-        const transporter = nodemailer.createTransport({
-            host: 'smtp-relay.brevo.com',
-            port: 587,
-            secure: false,
-            auth: {
-                user: process.env.BREVO_USER,      // usually your email
-                pass: process.env.BREVO_API_KEY   // Brevo SMTP key
+        const response = await axios.post(
+            'https://api.brevo.com/v3/smtp/email',
+            {
+                sender: {
+                    name: "ProjexHub",
+                    email: process.env.VERIFIED_GMAIL
+                },
+                to: [
+                    {
+                        email: userEmail
+                    }
+                ],
+                subject: "ProjexHub Verification Code",
+                htmlContent: `<h1>Your OTP</h1><h2>${message}</h2>`
+            },
+            {
+                headers: {
+                    'api-key': process.env.BREVO_API_KEY,
+                    'Content-Type': 'application/json'
+                }
             }
-        });
+        );
 
-        const mailOptions = {
-            from: `"ProjexHub" <${process.env.VERIFIED_GMAIL}>`, // must be verified in Brevo
-            to: userEmail,
-            subject: 'ProjexHub Verification Code',
-            html: `
-                <h1>ProjexHub Verification Code</h1>
-                <h2 style="color:blue;">${message}</h2>
-            `
-        };
-
-        const info = await transporter.sendMail(mailOptions);
-
-        console.log("Email sent ✅", info.messageId);
-        return { success: true, info };
+        console.log("Email sent ✅", response.data);
+        return { success: true };
 
     } catch (error) {
-        console.error("Brevo Error ❌:", error.message);
-        return { success: false, error };
+        console.error("Brevo API Error ❌:", error.response?.data || error.message);
+        return { success: false };
     }
 }
 
