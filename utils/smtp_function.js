@@ -1,31 +1,29 @@
-const { Resend } = require('resend');
+const sgMail = require('@sendgrid/mail');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 async function sendEmail(userEmail, message) {
     try {
-        console.log("Sending email via Resend to:", userEmail);
+        console.log("Sending email via SendGrid to:", userEmail);
 
-        const { data, error } = await resend.emails.send({
-            from: 'onboarding@resend.dev',
+        const msg = {
             to: userEmail,
+            from: process.env.VERIFIED_GMAIL,
             subject: 'ProjexHub Verification Code',
             html: `
                 <h1>ProjexHub Verification Code</h1>
                 <h2 style="color:blue;">${message}</h2>
             `
-        });
+        };
 
-        if (error) {
-            console.error("Resend API Error ❌:", error);
-            return { success: false, error };
-        }
+        const response = await sgMail.send(msg);
 
-        console.log("Email sent ✅", data);
-        return { success: true, data };
-    } catch (catchError) {
-        console.error("Resend Execution Error ❌:", catchError);
-        return { success: false, error: catchError };
+        console.log("Email sent ✅", response[0].statusCode);
+        return { success: true, response };
+
+    } catch (error) {
+        console.error("SendGrid Error ❌:", error.response?.body || error.message);
+        return { success: false, error };
     }
 }
 
