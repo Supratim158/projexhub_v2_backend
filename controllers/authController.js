@@ -43,7 +43,7 @@ module.exports = {
 
             //Send Otp to email
 
-            sendEmail(newUser.email, otp);
+            await sendEmail(newUser.email, otp);
 
             return res.status(201).json({status: true, message:"User Created Succesfully"});
         } catch (error) {
