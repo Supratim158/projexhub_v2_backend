@@ -1,14 +1,13 @@
 const express = require('express');
 const app = express();
 const dotenv = require('dotenv');
-const mongoose = require('mongoose');
-const AuthRoute = require('./routes/authRoutes')
-const UserRoute = require('./routes/userRoutes')
-const ProjectRoute = require('./routes/projectRoutes')
-const AiRoute = require('./routes/aiRoutes')
-
 dotenv.config();
 
+const mongoose = require('mongoose');
+const AuthRoute = require('./routes/authRoutes');
+const UserRoute = require('./routes/userRoutes');
+const ProjectRoute = require('./routes/projectRoutes');
+const AiRoute = require('./routes/aiRoutes');
 mongoose.connect(process.env.MONGOURL)
 .then(()=>console.log("ProjexHub DB connected"))
 .catch((err)=>console.log(err));
