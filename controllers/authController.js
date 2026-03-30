@@ -15,7 +15,7 @@ module.exports = {
 
         const minPasswordLength = 6;
 
-        if(req.body.password < minPasswordLength){
+        if(req.body.password.length < minPasswordLength){
             return res.status(400).json({status: false, message:"Password should be atleast "+minPasswordLength+"  characters"});
         }
 
@@ -27,23 +27,25 @@ module.exports = {
             }
 
             //generate Otp
-            const otp = generateOtp();
+            console.log("Step 1: API hit");
 
-            const newUser = new User({
-                userName: req.body.userName,
-                userType: "User",
-                email: req.body.email,
-                password: CryptoJs.AES.encrypt(req.body.password, process.env.SECRET).toString(),
-                otp: otp,
+const otp = generateOtp();
+console.log("Step 2: OTP generated:", otp);
 
-            });
+const newUser = new User({
+    userName: req.body.userName,
+    userType: "User",
+    email: req.body.email,
+    password: CryptoJs.AES.encrypt(req.body.password, process.env.SECRET).toString(),
+    otp: otp,
+});
 
-            //Save user
-            await newUser.save();
+await newUser.save();
+console.log("Step 3: User saved");
 
-            //Send Otp to email
-
-            await sendEmail(newUser.email, otp);
+console.log("Step 4: Calling sendEmail...");
+await sendEmail(newUser.email, otp);
+console.log("Step 5: Email function executed");
 
             return res.status(201).json({status: true, message:"User Created Succesfully"});
         } catch (error) {
@@ -61,7 +63,7 @@ module.exports = {
 
         const minPasswordLength = 6;
 
-        if(req.body.password < minPasswordLength){
+        if(req.body.password.length < minPasswordLength){
             return res.status(400).json({status: false, message:"Password should be atleast "+minPasswordLength+"  characters"});
         }
 
