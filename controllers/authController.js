@@ -97,4 +97,73 @@ console.log("Step 5: Email function executed");
             return res.status(500).json({status: false, message:error.message});
         }
     },
+
+    changePassword: async (req, res) => {
+    try {
+        const userId = req.user.id; // from JWT middleware
+        const { currentPassword, newPassword } = req.body;
+
+        // 🔹 Validate input
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                status: false,
+                message: "All fields are required"
+            });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                status: false,
+                message: "New password must be at least 6 characters"
+            });
+        }
+
+        // 🔹 Find user
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                status: false,
+                message: "User not found"
+            });
+        }
+
+        // 🔹 Decrypt old password
+        const decryptedPassword = CryptoJs.AES.decrypt(
+            user.password,
+            process.env.SECRET
+        );
+
+        const oldPassword = decryptedPassword.toString(CryptoJs.enc.Utf8);
+
+        // 🔹 Compare passwords
+        if (oldPassword !== currentPassword) {
+            return res.status(400).json({
+                status: false,
+                message: "Current password is incorrect"
+            });
+        }
+
+        // 🔹 Encrypt new password
+        const encryptedNewPassword = CryptoJs.AES.encrypt(
+            newPassword,
+            process.env.SECRET
+        ).toString();
+
+        // 🔹 Update password
+        user.password = encryptedNewPassword;
+        await user.save();
+
+        return res.status(200).json({
+            status: true,
+            message: "Password updated successfully"
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            status: false,
+            message: error.message
+        });
+    }
+}
 }

@@ -8,6 +8,7 @@ const AuthRoute = require('./routes/authRoutes');
 const UserRoute = require('./routes/userRoutes');
 const ProjectRoute = require('./routes/projectRoutes');
 const AiRoute = require('./routes/aiRoutes');
+const FeedbackRoutes = require('./routes/feedbackRoutes')
 mongoose.connect(process.env.MONGOURL)
 .then(()=>console.log("ProjexHub DB connected"))
 .catch((err)=>console.log(err));
@@ -18,5 +19,6 @@ app.use("/",AuthRoute);
 app.use("/api/users",UserRoute);
 app.use("/api/projects",ProjectRoute);
 app.use("/api/ai",AiRoute);
+app.use("/api/feedback",FeedbackRoutes);
 
 app.listen(process.env.PORT || 1505, () => console.log(`ProjexHub backend is running on port ${process.env.PORT}`))
