@@ -40,6 +40,8 @@ router.post("/:id/comment/:commentId/reply", verifyTokenAndAuthorization, projec
 // Delete a project
 router.delete('/:id', verifyTokenAndAuthorization, projectController.deleteProject);
 
+router.get('/top/categories', projectController.getTopProjectsByCategory);
+
 // ================= ADMIN ROUTES =================
 
 // Get all pending projects

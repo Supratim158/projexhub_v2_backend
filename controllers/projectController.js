@@ -381,5 +381,69 @@ getProjectComments : async (req, res) => {
   }
 },
 
+// 🔥 GET TOP PROJECTS BY CATEGORY (Highest Engagement)
+getTopProjectsByCategory: async (req, res) => {
+  try {
+    const categories = ["AI", "ML", "IoT", "App", "Web", "Blockchain", "Others"];
+
+    let result = {};
+
+    for (let category of categories) {
+      const projects = await Project.aggregate([
+        {
+          $match: {
+            categories: category,
+            status: "approved",
+          },
+        },
+        {
+          $addFields: {
+            // ✅ total comments count
+            commentCount: { $size: "$comments" },
+
+            // 🔥 ADVANCED ENGAGEMENT SCORE
+            engagementScore: {
+              $add: [
+                { $multiply: ["$likeCount", 2] }, // 👍 likes weight = 2
+                { $size: "$comments" }, // 💬 comments
+                {
+                  $reduce: {
+                    input: "$comments",
+                    initialValue: 0,
+                    in: {
+                      $add: [
+                        "$$value",
+                        { $size: "$$this.replies" } // 🔁 replies count
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+          },
+        },
+        {
+          $sort: { engagementScore: -1 },
+        },
+        {
+          $limit: 5,
+        },
+      ]);
+
+      result[category] = projects;
+    }
+
+    res.status(200).json({
+      status: true,
+      data: result,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+},
     
 };
