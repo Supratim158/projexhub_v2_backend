@@ -138,24 +138,47 @@ module.exports = {
 },
 
     updateProject: async (req, res) => {
-        try {
-            const project = await Project.findById(req.params.id);
-            if (!project) return res.status(404).json({ status: false, message: "Project not found" });
-            
-            if (project.userId.toString() !== req.user.id && req.user.userType !== 'Admin') {
-                return res.status(403).json({ status: false, message: "You can update only your projects unless you are an Admin" });
-            }
-
-            const updatedProject = await Project.findByIdAndUpdate(
-                req.params.id,
-                { $set: req.body },
-                { returnDocument: 'after' }
-            );
-            res.status(200).json(updatedProject);
-        } catch (error) {
-            res.status(500).json({ status: false, message: error.message });
+    try {
+        const project = await Project.findById(req.params.id);
+        if (!project) {
+            return res.status(404).json({
+                status: false,
+                message: "Project not found"
+            });
         }
-    },
+
+        // 🔒 Authorization check
+        if (
+            project.userId.toString() !== req.user.id &&
+            req.user.userType !== 'Admin'
+        ) {
+            return res.status(403).json({
+                status: false,
+                message: "You can update only your projects unless you are an Admin"
+            });
+        }
+
+        // ✅ Force status to Pending
+        const updatedProject = await Project.findByIdAndUpdate(
+            req.params.id,
+            {
+                $set: {
+                    ...req.body,
+                    status: "Pending"   // 🔥 always reset
+                }
+            },
+            { returnDocument: 'after' } // better than returnDocument
+        );
+
+        res.status(200).json(updatedProject);
+
+    } catch (error) {
+        res.status(500).json({
+            status: false,
+            message: error.message
+        });
+    }
+},
 
     deleteProject: async (req, res) => {
         try {
