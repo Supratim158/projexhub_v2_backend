@@ -164,7 +164,7 @@ module.exports = {
             {
                 $set: {
                     ...req.body,
-                    status: "Pending"   // 🔥 always reset
+                    status: "pending"   // 🔥 always reset
                 }
             },
             { returnDocument: 'after' } // better than returnDocument
