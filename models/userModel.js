@@ -11,6 +11,8 @@ const UserSchema = new mongoose.Schema({
     phoneVerification:{type:Boolean, default:false},
     userType:{type:String, required:true, default:"User", enum:['User','Admin']},
     profile:{type:String,default:"https://res.cloudinary.com/dwv7t8jvx/image/upload/v1771443605/profilepic_hh9twv.jpg"},
+    role: { type: String, default: "Software Developer Engineer" },
+    bio: { type: String, default: "I am Software Developer Engineer" },
 },
 {timestamps: true}
 );

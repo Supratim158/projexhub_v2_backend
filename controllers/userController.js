@@ -110,7 +110,7 @@ module.exports = {
 
     updateProfile: async (req, res) => {
     try {
-        const { userName, email, profile } = req.body;
+        const { userName, email, profile, bio, role } = req.body;
 
         const user = await User.findById(req.user.id);
 
@@ -124,6 +124,16 @@ module.exports = {
         // ✅ Username update
         if (userName) {
             user.userName = userName.trim();
+        }
+
+        // ✅ Role update
+        if (role) {
+            user.role = role.trim();
+        }
+
+        // ✅ Bio update
+        if (bio) {
+            user.bio = bio.trim();
         }
 
         // ✅ Email validation + duplicate check
