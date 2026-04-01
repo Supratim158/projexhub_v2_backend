@@ -43,6 +43,7 @@ const ProjectSchema = new mongoose.Schema(
     memberSize: { type: Number, required: true },
     duration: { type: String, required: true },
     memberNames: { type: [String], required: true },
+    memberIds: { type: [String], required: true },
 
     status: {
         type: String,
