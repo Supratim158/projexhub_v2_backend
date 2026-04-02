@@ -449,7 +449,7 @@ getTopProjectsByCategory: async (req, res) => {
           $sort: { engagementScore: -1 },
         },
         {
-          $limit: 5,
+          $limit: 1,
         },
       ]);
 
