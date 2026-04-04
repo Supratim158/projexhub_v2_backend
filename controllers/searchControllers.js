@@ -50,6 +50,7 @@ const searchProjects = async (req, res) => {
           title: 1,
           description: 1,
           createdAt: 1,
+          status: 1,
 
           // ✅ FIRST IMAGE ONLY
           image: { $arrayElemAt: ["$images", 0] },
