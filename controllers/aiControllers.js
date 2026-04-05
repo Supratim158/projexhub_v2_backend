@@ -3,200 +3,243 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const Project = require("../models/projectModel");
 
-// 🔹 Convert image → base64
-const imageToBase64 = (path) => {
+
+// =======================================
+// 🔹 IMAGE → BASE64 (MULTIPLE)
+// =======================================
+const imagesToBase64 = (paths = []) => {
     try {
-        const image = fs.readFileSync(path);
-        return image.toString("base64");
-    } catch {
-        return null;
+        return paths.map((path) => {
+            const img = fs.readFileSync(path);
+            return img.toString("base64");
+        });
+    } catch (err) {
+        console.log("Image error:", err.message);
+        return [];
     }
 };
 
-// 🔹 Extract PDF
+
+// =======================================
+// 🔹 PDF TEXT EXTRACTOR
+// =======================================
 const extractPdfText = async (path) => {
     try {
         const buffer = fs.readFileSync(path);
         const data = await pdfParse(buffer);
-        return data.text.substring(0, 3000);
-    } catch {
+        return data.text.substring(0, 1500); // 🔥 limit size
+    } catch (err) {
+        console.log("PDF error:", err.message);
         return "";
     }
 };
 
-// 🔹 Common Project Data Builder
-const buildProjectContext = async (project) => {
-    let pdfText = "";
-    let imageBase64 = null;
 
-    if (project.pdf) {
-        pdfText = await extractPdfText(project.pdf);
+// =======================================
+// 🔹 BUILD PROJECT CONTEXT (IMPORTANT)
+// =======================================
+const buildProjectContext = async (project) => {
+    let reportText = "";
+    let pptText = "";
+    let imagesBase64 = [];
+
+    // 📄 Report PDF
+    if (project.projectReportPdf) {
+        reportText = await extractPdfText(project.projectReportPdf);
     }
 
-    if (project.image) {
-        imageBase64 = imageToBase64(project.image);
+    // 📊 PPT PDF
+    if (project.projectPptPdf) {
+        pptText = await extractPdfText(project.projectPptPdf);
+    }
+
+    // 🖼️ Images
+    if (project.images && project.images.length > 0) {
+        imagesBase64 = imagesToBase64(project.images).slice(0, 3); // limit images
     }
 
     const textContext = `
 Title: ${project.title}
 Tagline: ${project.tagline}
 Description: ${project.description}
-Tech Stack: ${project.techStack}
 
-PDF Content:
-${pdfText}
+Technologies: ${project.technologies?.join(", ")}
+Categories: ${project.categories?.join(", ")}
+
+Team Size: ${project.memberSize}
+Duration: ${project.duration}
+
+--------------------------------
+
+📄 Report Content:
+${reportText}
+
+--------------------------------
+
+📊 PPT Content:
+${pptText}
 `;
 
-    return { textContext, imageBase64 };
+    return { textContext, imagesBase64 };
 };
 
-// 🔹 Gemini Call
-const callGemini = async (prompt, imageBase64 = null) => {
-    const body = {
-    contents: [
-        {
-        parts: [
-            { text: prompt },
-            ...(imageBase64
-            ? [
-                {
-                    inlineData: {
+
+// =======================================
+// 🔹 GEMINI API CALL (MULTI-MODAL)
+// =======================================
+const callGemini = async (prompt, imagesBase64 = []) => {
+    try {
+        const parts = [{ text: prompt }];
+
+        // Attach multiple images
+        imagesBase64.forEach((img) => {
+            parts.push({
+                inlineData: {
                     mimeType: "image/jpeg",
-                    data: imageBase64,
-                    },
+                    data: img,
                 },
-                ]
-            : []),
-        ],
-        },
-    ],
-    };
+            });
+        });
 
-    const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    body,
-    { headers: { "Content-Type": "application/json" } }
-    );
+        const body = {
+            contents: [{ parts }],
+        };
 
-    return response.data.candidates[0].content.parts[0].text;
+        const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            body,
+            { headers: { "Content-Type": "application/json" } }
+        );
+
+        return response.data.candidates[0].content.parts[0].text;
+    } catch (err) {
+        console.log("Gemini error:", err.response?.data || err.message);
+        throw new Error("AI request failed");
+    }
 };
 
 
-
 // =======================================
-// 🔥 1. SUMMARY
+// 🔥 1. PROJECT SUMMARY
 // =======================================
-
 exports.getProjectSummary = async (req, res) => {
     try {
-    const project = await Project.findById(req.params.id);
-    if (!project) return res.status(404).json({ message: "Not found" });
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: "Project not found" });
 
-    if (project.aiSummary) {
-        return res.json({ summary: project.aiSummary });
-    }
+        // Cache check
+        if (project.aiSummary) {
+            return res.json({ summary: project.aiSummary });
+        }
 
-    const { textContext, imageBase64 } = await buildProjectContext(project);
+        const { textContext, imagesBase64 } = await buildProjectContext(project);
 
-    const prompt = `
-Summarize this project clearly (5-6 lines):
+        const prompt = `
+Summarize this project in 5-6 clear lines.
 
+Make it:
+- Simple
+- Engaging
+- Easy to understand
+
+Project:
 ${textContext}
-
-Make it simple, engaging and easy to understand.
 `;
 
-    const summary = await callGemini(prompt, imageBase64);
+        const summary = await callGemini(prompt, imagesBase64);
 
-    project.aiSummary = summary;
-    await project.save();
+        project.aiSummary = summary;
+        await project.save();
 
-    res.json({ summary });
+        res.json({ summary });
 
-    } catch (e) {
-    res.status(500).json({ error: e.message });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 };
-
 
 
 // =======================================
 // 💬 2. CHAT WITH PROJECT
 // =======================================
-
 exports.askProjectQuestion = async (req, res) => {
     try {
-    const { question } = req.body;
+        const { question } = req.body;
 
-    if (!question) {
-        return res.status(400).json({ message: "Question is required" });
-    }
+        if (!question) {
+            return res.status(400).json({ message: "Question is required" });
+        }
 
-    const project = await Project.findById(req.params.id);
-    if (!project) return res.status(404).json({ message: "Not found" });
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: "Project not found" });
 
-    const { textContext, imageBase64 } = await buildProjectContext(project);
+        const { textContext, imagesBase64 } = await buildProjectContext(project);
 
-    const prompt = `
-You are an AI assistant helping users understand a project.
+        const prompt = `
+You are an AI assistant explaining a student project.
 
-Project Data:
+Answer the user clearly and concisely.
+
+Project Details:
 ${textContext}
 
 User Question:
 ${question}
-
-Answer clearly and concisely.
 `;
 
-    const answer = await callGemini(prompt, imageBase64);
+        const answer = await callGemini(prompt, imagesBase64);
 
-    res.json({ answer });
+        res.json({ answer });
 
-    } catch (e) {
-    res.status(500).json({ error: e.message });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 };
 
 
-
 // =======================================
-// ⭐ 3. PROJECT SCORING
+// ⭐ 3. PROJECT EVALUATION
 // =======================================
-
 exports.getProjectScore = async (req, res) => {
     try {
-    const project = await Project.findById(req.params.id);
-    if (!project) return res.status(404).json({ message: "Not found" });
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: "Project not found" });
 
-    const { textContext } = await buildProjectContext(project);
+        const { textContext, imagesBase64 } = await buildProjectContext(project);
 
-    const prompt = `
-Evaluate this project and give:
+        const prompt = `
+Evaluate this project strictly.
 
+Give:
 1. Score out of 10
 2. Strengths
 3. Weaknesses
 4. Suggestions to improve
 
+Be honest and technical.
+
 Project:
 ${textContext}
 
 Format:
+
 Score: X/10
+
 Strengths:
 - ...
+
 Weaknesses:
 - ...
+
 Suggestions:
 - ...
 `;
 
-    const result = await callGemini(prompt);
+        const result = await callGemini(prompt, imagesBase64);
 
-    res.json({ evaluation: result });
+        res.json({ evaluation: result });
 
-    } catch (e) {
-    res.status(500).json({ error: e.message });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 };
