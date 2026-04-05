@@ -1,11 +1,14 @@
 const axios = require("axios");
-const pdfParse = require("pdf-parse");
+// const pdfParse = require("pdf-parse");
 const Project = require("../models/projectModel");
 
 
 // =======================================
 // 🔹 PDF TEXT EXTRACTOR (CLOUDINARY URL)
 // =======================================
+const pdfParseLib = require("pdf-parse");
+const pdfParse = pdfParseLib.default || pdfParseLib;
+
 const extractPdfText = async (url) => {
     try {
         if (!url) return "";
@@ -17,7 +20,8 @@ const extractPdfText = async (url) => {
         const buffer = Buffer.from(response.data);
         const data = await pdfParse(buffer);
 
-        return data.text.substring(0, 1500); // limit tokens
+        return data.text.substring(0, 1500);
+
     } catch (err) {
         console.log("PDF error:", err.message);
         return "";
