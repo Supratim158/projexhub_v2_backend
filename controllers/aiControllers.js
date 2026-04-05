@@ -46,20 +46,28 @@ const buildProjectContext = async (project) => {
 
     // 🖼️ Images (limit for token safety)
     if (project.images && project.images.length > 0) {
-        imagesBase64 = await imagesToBase64(project.images);
+        imagesBase64 = project.images.map(img => imageToBase64(img)).filter(Boolean);
         imagesBase64 = imagesBase64.slice(0, 3);
     }
 
     const textContext = `
-Title: ${project.title}
-Tagline: ${project.tagline}
-Description: ${project.description}
+Title: ${project.title || "N/A"}
+Tagline: ${project.tagline || "N/A"}
+Description: ${project.description || "N/A"}
 
-Technologies: ${project.technologies?.join(", ")}
-Categories: ${project.categories?.join(", ")}
+Technologies: ${project.technologies?.join(", ") || "N/A"}
+Categories: ${project.categories?.join(", ") || "N/A"}
 
-Team Size: ${project.memberSize}
-Duration: ${project.duration}
+Team Size: ${project.memberSize || "N/A"}
+Member Names: ${project.memberNames?.join(", ") || "N/A"}
+Duration: ${project.duration || "N/A"}
+
+Repository Link: ${project.repoLink || "N/A"}
+Demo Link: ${project.demoLink || "N/A"}
+Status: ${project.status || "N/A"}
+Likes: ${project.likeCount || 0}
+Comments count: ${project.comments?.length || 0}
+User ID: ${project.userId || "N/A"}
 
 --------------------------------
 
