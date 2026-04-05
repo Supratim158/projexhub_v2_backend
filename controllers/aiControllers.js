@@ -1,58 +1,27 @@
+
 const axios = require("axios");
-// const pdfParse = require("pdf-parse");
+const fs = require("fs");
+const pdfParse = require("pdf-parse");
 const Project = require("../models/projectModel");
 
-
-// =======================================
-// 🔹 PDF TEXT EXTRACTOR (CLOUDINARY URL)
-// =======================================
-const pdfParseLib = require("pdf-parse");
-const pdfParse = pdfParseLib.default || pdfParseLib;
-
-const extractPdfText = async (url) => {
+// 🔹 Convert image → base64
+const imageToBase64 = (path) => {
     try {
-        if (!url) return "";
-
-        const response = await axios.get(url, {
-            responseType: "arraybuffer",
-        });
-
-        const buffer = Buffer.from(response.data);
-        const data = await pdfParse(buffer);
-
-        return data.text.substring(0, 1500);
-
-    } catch (err) {
-        console.log("PDF error:", err.message);
-        return "";
+        const image = fs.readFileSync(path);
+        return image.toString("base64");
+    } catch {
+        return null;
     }
 };
 
-
-// =======================================
-// 🔹 IMAGE → BASE64 (CLOUDINARY URL)
-// =======================================
-const imagesToBase64 = async (urls = []) => {
+// 🔹 Extract PDF
+const extractPdfText = async (path) => {
     try {
-        const results = await Promise.all(
-            urls.map(async (url) => {
-                try {
-                    const response = await axios.get(url, {
-                        responseType: "arraybuffer",
-                    });
-
-                    return Buffer.from(response.data).toString("base64");
-                } catch (err) {
-                    console.log("Image error:", err.message);
-                    return null;
-                }
-            })
-        );
-
-        return results.filter(Boolean); // remove nulls
-    } catch (err) {
-        console.log("Image batch error:", err.message);
-        return [];
+        const buffer = fs.readFileSync(path);
+        const data = await pdfParse(buffer);
+        return data.text.substring(0, 3000);
+    } catch {
+        return "";
     }
 };
 
