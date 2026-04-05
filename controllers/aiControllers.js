@@ -1,33 +1,23 @@
 const axios = require("axios");
-const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const Project = require("../models/projectModel");
 
 
 // =======================================
-// 🔹 IMAGE → BASE64 (MULTIPLE)
+// 🔹 PDF TEXT EXTRACTOR (CLOUDINARY URL)
 // =======================================
-const imagesToBase64 = (paths = []) => {
+const extractPdfText = async (url) => {
     try {
-        return paths.map((path) => {
-            const img = fs.readFileSync(path);
-            return img.toString("base64");
+        if (!url) return "";
+
+        const response = await axios.get(url, {
+            responseType: "arraybuffer",
         });
-    } catch (err) {
-        console.log("Image error:", err.message);
-        return [];
-    }
-};
 
-
-// =======================================
-// 🔹 PDF TEXT EXTRACTOR
-// =======================================
-const extractPdfText = async (path) => {
-    try {
-        const buffer = fs.readFileSync(path);
+        const buffer = Buffer.from(response.data);
         const data = await pdfParse(buffer);
-        return data.text.substring(0, 1500); // 🔥 limit size
+
+        return data.text.substring(0, 1500); // limit tokens
     } catch (err) {
         console.log("PDF error:", err.message);
         return "";
@@ -36,7 +26,35 @@ const extractPdfText = async (path) => {
 
 
 // =======================================
-// 🔹 BUILD PROJECT CONTEXT (IMPORTANT)
+// 🔹 IMAGE → BASE64 (CLOUDINARY URL)
+// =======================================
+const imagesToBase64 = async (urls = []) => {
+    try {
+        const results = await Promise.all(
+            urls.map(async (url) => {
+                try {
+                    const response = await axios.get(url, {
+                        responseType: "arraybuffer",
+                    });
+
+                    return Buffer.from(response.data).toString("base64");
+                } catch (err) {
+                    console.log("Image error:", err.message);
+                    return null;
+                }
+            })
+        );
+
+        return results.filter(Boolean); // remove nulls
+    } catch (err) {
+        console.log("Image batch error:", err.message);
+        return [];
+    }
+};
+
+
+// =======================================
+// 🔹 BUILD PROJECT CONTEXT
 // =======================================
 const buildProjectContext = async (project) => {
     let reportText = "";
@@ -53,9 +71,10 @@ const buildProjectContext = async (project) => {
         pptText = await extractPdfText(project.projectPptPdf);
     }
 
-    // 🖼️ Images
+    // 🖼️ Images (limit for token safety)
     if (project.images && project.images.length > 0) {
-        imagesBase64 = imagesToBase64(project.images).slice(0, 3); // limit images
+        imagesBase64 = await imagesToBase64(project.images);
+        imagesBase64 = imagesBase64.slice(0, 3);
     }
 
     const textContext = `
@@ -85,13 +104,13 @@ ${pptText}
 
 
 // =======================================
-// 🔹 GEMINI API CALL (MULTI-MODAL)
+// 🔹 GEMINI MULTIMODAL CALL
 // =======================================
 const callGemini = async (prompt, imagesBase64 = []) => {
     try {
         const parts = [{ text: prompt }];
 
-        // Attach multiple images
+        // Attach images
         imagesBase64.forEach((img) => {
             parts.push({
                 inlineData: {
@@ -108,10 +127,13 @@ const callGemini = async (prompt, imagesBase64 = []) => {
         const response = await axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
             body,
-            { headers: { "Content-Type": "application/json" } }
+            {
+                headers: { "Content-Type": "application/json" },
+            }
         );
 
-        return response.data.candidates[0].content.parts[0].text;
+        return response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No response from AI";
+
     } catch (err) {
         console.log("Gemini error:", err.response?.data || err.message);
         throw new Error("AI request failed");
@@ -127,7 +149,7 @@ exports.getProjectSummary = async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: "Project not found" });
 
-        // Cache check
+        // Cache
         if (project.aiSummary) {
             return res.json({ summary: project.aiSummary });
         }
@@ -135,7 +157,7 @@ exports.getProjectSummary = async (req, res) => {
         const { textContext, imagesBase64 } = await buildProjectContext(project);
 
         const prompt = `
-Summarize this project in 5-6 clear lines.
+Summarize this project in 5-6 lines.
 
 Make it:
 - Simple
@@ -176,9 +198,9 @@ exports.askProjectQuestion = async (req, res) => {
         const { textContext, imagesBase64 } = await buildProjectContext(project);
 
         const prompt = `
-You are an AI assistant explaining a student project.
+You are an AI assistant helping users understand a student project.
 
-Answer the user clearly and concisely.
+Answer clearly and concisely.
 
 Project Details:
 ${textContext}
