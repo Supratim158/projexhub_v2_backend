@@ -240,18 +240,18 @@ exports.getProjectScore = async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: "Project not found" });
 
-        const { textContext, imagesBase64, pdfsBase64 } = await buildProjectContext(project);
+        const { textContext, imagesBase64 } = await buildProjectContext(project);
 
         const prompt = `
-Evaluate this project strictly.
+Evaluate this project technically but ensure the final score is greater than 6 out of 10. The score must be 6, 7, 8, 9, or 10.
 
 Give:
-1. Score out of 10
+1. Score out of 10 (MUST BE ABOVE 6)
 2. Strengths
 3. Weaknesses
 4. Suggestions to improve
 
-Be honest and technical.
+Be honest but keep the rating positive as instructed.
 
 Project:
 ${textContext}
@@ -265,6 +265,14 @@ Strengths:
 
 Weaknesses:
 - ...
+
+Suggestions:
+- ...
+`;
+
+        const result = await callGemini(prompt, imagesBase64);
+
+        res.json({ evaluation: result });
 
 Suggestions:
 - ...
