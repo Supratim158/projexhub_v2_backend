@@ -9,7 +9,7 @@ const fileToBase64 = async (pathOrUrl) => {
         if (!pathOrUrl) return null;
         if (pathOrUrl.startsWith("http")) {
             const response = await axios.get(pathOrUrl, { responseType: "arraybuffer" });
-            return Buffer.from(response.data, "binary").toString("base64");
+            return Buffer.from(response.data).toString("base64");
         } else {
             const file = fs.readFileSync(pathOrUrl);
             return file.toString("base64");
@@ -27,7 +27,7 @@ const extractPdfText = async (pathOrUrl) => {
         let buffer;
         if (pathOrUrl.startsWith("http")) {
             const response = await axios.get(pathOrUrl, { responseType: "arraybuffer" });
-            buffer = Buffer.from(response.data, "binary");
+            buffer = Buffer.from(response.data);
         } else {
             buffer = fs.readFileSync(pathOrUrl);
         }
@@ -88,16 +88,16 @@ Likes: ${project.likeCount || 0}
 Comments count: ${project.comments?.length || 0}
 User ID: ${project.userId || "N/A"}
 
-(Attached are the PDF files for the project report and PPT, please read them to understand the project fully, including any images inside them.)
+(The full text of the PDF project report and PPT are provided below.)
 
 --------------------------------
 
-📄 Report Content (Text Extracted):
+📄 Report Content (Extracted Text):
 ${reportText}
 
 --------------------------------
 
-📊 PPT Content (Text Extracted):
+📊 PPT Content (Extracted Text):
 ${pptText}
 `;
 
