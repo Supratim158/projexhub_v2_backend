@@ -243,15 +243,15 @@ exports.getProjectScore = async (req, res) => {
         const { textContext, imagesBase64 } = await buildProjectContext(project);
 
         const prompt = `
-Evaluate this project technically but ensure the final score is greater than 6 out of 10. The score must be 6, 7, 8, 9, or 10.
+Evaluate this project technically and objectively.
 
 Give:
-1. Score out of 10 (MUST BE ABOVE 6)
+1. Score out of 10 (from 1 to 10)
 2. Strengths
 3. Weaknesses
 4. Suggestions to improve
 
-Be honest but keep the rating positive as instructed.
+Be honest and provide constructive feedback.
 
 Project:
 ${textContext}
