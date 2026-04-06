@@ -1,52 +1,39 @@
-
 const axios = require("axios");
 const fs = require("fs");
-const pdfParse = require("pdf-parse");
 const Project = require("../models/projectModel");
 
-// 🔹 Convert image → base64
-const imageToBase64 = (path) => {
+// 🔹 Convert file → base64
+const fileToBase64 = (path) => {
     try {
-        const image = fs.readFileSync(path);
-        return image.toString("base64");
+        const file = fs.readFileSync(path);
+        return file.toString("base64");
     } catch {
         return null;
     }
 };
 
-// 🔹 Extract PDF
-const extractPdfText = async (path) => {
-    try {
-        const buffer = fs.readFileSync(path);
-        const data = await pdfParse(buffer);
-        return data.text.substring(0, 3000);
-    } catch {
-        return "";
-    }
-};
-
-
 // =======================================
 // 🔹 BUILD PROJECT CONTEXT
 // =======================================
 const buildProjectContext = async (project) => {
-    let reportText = "";
-    let pptText = "";
+    let pdfsBase64 = [];
     let imagesBase64 = [];
 
     // 📄 Report PDF
     if (project.projectReportPdf) {
-        reportText = await extractPdfText(project.projectReportPdf);
+        const pdf = fileToBase64(project.projectReportPdf);
+        if (pdf) pdfsBase64.push({ type: "report", data: pdf });
     }
 
     // 📊 PPT PDF
     if (project.projectPptPdf) {
-        pptText = await extractPdfText(project.projectPptPdf);
+        const pdf = fileToBase64(project.projectPptPdf);
+        if (pdf) pdfsBase64.push({ type: "ppt", data: pdf });
     }
 
     // 🖼️ Images (limit for token safety)
     if (project.images && project.images.length > 0) {
-        imagesBase64 = project.images.map(img => imageToBase64(img)).filter(Boolean);
+        imagesBase64 = project.images.map(img => fileToBase64(img)).filter(Boolean);
         imagesBase64 = imagesBase64.slice(0, 3);
     }
 
@@ -69,27 +56,29 @@ Likes: ${project.likeCount || 0}
 Comments count: ${project.comments?.length || 0}
 User ID: ${project.userId || "N/A"}
 
---------------------------------
-
-📄 Report Content:
-${reportText}
-
---------------------------------
-
-📊 PPT Content:
-${pptText}
+(Attached are the PDF files for the project report and PPT, please read them to understand the project fully, including any images inside them.)
 `;
 
-    return { textContext, imagesBase64 };
+    return { textContext, imagesBase64, pdfsBase64 };
 };
 
 
 // =======================================
 // 🔹 GEMINI MULTIMODAL CALL
 // =======================================
-const callGemini = async (prompt, imagesBase64 = []) => {
+const callGemini = async (prompt, imagesBase64 = [], pdfsBase64 = []) => {
     try {
         const parts = [{ text: prompt }];
+
+        // Attach PDFs
+        pdfsBase64.forEach((pdf) => {
+            parts.push({
+                inlineData: {
+                    mimeType: "application/pdf",
+                    data: pdf.data,
+                },
+            });
+        });
 
         // Attach images
         imagesBase64.forEach((img) => {
@@ -110,6 +99,8 @@ const callGemini = async (prompt, imagesBase64 = []) => {
             body,
             {
                 headers: { "Content-Type": "application/json" },
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity
             }
         );
 
@@ -120,7 +111,6 @@ const callGemini = async (prompt, imagesBase64 = []) => {
         throw new Error("AI request failed");
     }
 };
-
 
 // =======================================
 // 🔥 1. PROJECT SUMMARY
@@ -135,7 +125,7 @@ exports.getProjectSummary = async (req, res) => {
             return res.json({ summary: project.aiSummary });
         }
 
-        const { textContext, imagesBase64 } = await buildProjectContext(project);
+        const { textContext, imagesBase64, pdfsBase64 } = await buildProjectContext(project);
 
         const prompt = `
 Summarize this project in 5-6 lines.
@@ -149,7 +139,7 @@ Project:
 ${textContext}
 `;
 
-        const summary = await callGemini(prompt, imagesBase64);
+        const summary = await callGemini(prompt, imagesBase64, pdfsBase64);
 
         project.aiSummary = summary;
         await project.save();
@@ -176,7 +166,7 @@ exports.askProjectQuestion = async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: "Project not found" });
 
-        const { textContext, imagesBase64 } = await buildProjectContext(project);
+        const { textContext, imagesBase64, pdfsBase64 } = await buildProjectContext(project);
 
         const prompt = `
 You are an AI assistant helping users understand a student project.
@@ -190,7 +180,7 @@ User Question:
 ${question}
 `;
 
-        const answer = await callGemini(prompt, imagesBase64);
+        const answer = await callGemini(prompt, imagesBase64, pdfsBase64);
 
         res.json({ answer });
 
@@ -208,7 +198,7 @@ exports.getProjectScore = async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: "Project not found" });
 
-        const { textContext, imagesBase64 } = await buildProjectContext(project);
+        const { textContext, imagesBase64, pdfsBase64 } = await buildProjectContext(project);
 
         const prompt = `
 Evaluate this project strictly.
@@ -238,7 +228,7 @@ Suggestions:
 - ...
 `;
 
-        const result = await callGemini(prompt, imagesBase64);
+        const result = await callGemini(prompt, imagesBase64, pdfsBase64);
 
         res.json({ evaluation: result });
 
