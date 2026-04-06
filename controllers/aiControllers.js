@@ -1,5 +1,6 @@
 const axios = require("axios");
 const fs = require("fs");
+const pdfParse = require("pdf-parse");
 const Project = require("../models/projectModel");
 
 // 🔹 Convert file → base64
@@ -12,21 +13,36 @@ const fileToBase64 = (path) => {
     }
 };
 
+// 🔹 Extract PDF Text
+const extractPdfText = async (path) => {
+    try {
+        const buffer = fs.readFileSync(path);
+        const data = await pdfParse(buffer);
+        return data.text; // Return all text
+    } catch {
+        return "";
+    }
+};
+
 // =======================================
 // 🔹 BUILD PROJECT CONTEXT
 // =======================================
 const buildProjectContext = async (project) => {
     let pdfsBase64 = [];
     let imagesBase64 = [];
+    let reportText = "";
+    let pptText = "";
 
     // 📄 Report PDF
     if (project.projectReportPdf) {
+        reportText = await extractPdfText(project.projectReportPdf);
         const pdf = fileToBase64(project.projectReportPdf);
         if (pdf) pdfsBase64.push({ type: "report", data: pdf });
     }
 
     // 📊 PPT PDF
     if (project.projectPptPdf) {
+        pptText = await extractPdfText(project.projectPptPdf);
         const pdf = fileToBase64(project.projectPptPdf);
         if (pdf) pdfsBase64.push({ type: "ppt", data: pdf });
     }
@@ -57,6 +73,16 @@ Comments count: ${project.comments?.length || 0}
 User ID: ${project.userId || "N/A"}
 
 (Attached are the PDF files for the project report and PPT, please read them to understand the project fully, including any images inside them.)
+
+--------------------------------
+
+📄 Report Content (Text Extracted):
+${reportText}
+
+--------------------------------
+
+📊 PPT Content (Text Extracted):
+${pptText}
 `;
 
     return { textContext, imagesBase64, pdfsBase64 };
