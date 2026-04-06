@@ -3,23 +3,38 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const Project = require("../models/projectModel");
 
-// 🔹 Convert file → base64
-const fileToBase64 = (path) => {
+// 🔹 Convert file/URL → base64
+const fileToBase64 = async (pathOrUrl) => {
     try {
-        const file = fs.readFileSync(path);
-        return file.toString("base64");
-    } catch {
+        if (!pathOrUrl) return null;
+        if (pathOrUrl.startsWith("http")) {
+            const response = await axios.get(pathOrUrl, { responseType: "arraybuffer" });
+            return Buffer.from(response.data, "binary").toString("base64");
+        } else {
+            const file = fs.readFileSync(pathOrUrl);
+            return file.toString("base64");
+        }
+    } catch (err) {
+        console.error("Error fetching file for base64:", err.message);
         return null;
     }
 };
 
 // 🔹 Extract PDF Text
-const extractPdfText = async (path) => {
+const extractPdfText = async (pathOrUrl) => {
     try {
-        const buffer = fs.readFileSync(path);
+        if (!pathOrUrl) return "";
+        let buffer;
+        if (pathOrUrl.startsWith("http")) {
+            const response = await axios.get(pathOrUrl, { responseType: "arraybuffer" });
+            buffer = Buffer.from(response.data, "binary");
+        } else {
+            buffer = fs.readFileSync(pathOrUrl);
+        }
         const data = await pdfParse(buffer);
         return data.text; // Return all text
-    } catch {
+    } catch (err) {
+        console.error("Error parsing PDF text:", err.message);
         return "";
     }
 };
@@ -36,21 +51,22 @@ const buildProjectContext = async (project) => {
     // 📄 Report PDF
     if (project.projectReportPdf) {
         reportText = await extractPdfText(project.projectReportPdf);
-        const pdf = fileToBase64(project.projectReportPdf);
+        const pdf = await fileToBase64(project.projectReportPdf);
         if (pdf) pdfsBase64.push({ type: "report", data: pdf });
     }
 
     // 📊 PPT PDF
     if (project.projectPptPdf) {
         pptText = await extractPdfText(project.projectPptPdf);
-        const pdf = fileToBase64(project.projectPptPdf);
+        const pdf = await fileToBase64(project.projectPptPdf);
         if (pdf) pdfsBase64.push({ type: "ppt", data: pdf });
     }
 
     // 🖼️ Images (limit for token safety)
     if (project.images && project.images.length > 0) {
-        imagesBase64 = project.images.map(img => fileToBase64(img)).filter(Boolean);
-        imagesBase64 = imagesBase64.slice(0, 3);
+        const imagePromises = project.images.slice(0, 3).map(img => fileToBase64(img));
+        const resolvedImages = await Promise.all(imagePromises);
+        imagesBase64 = resolvedImages.filter(Boolean);
     }
 
     const textContext = `
