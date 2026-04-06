@@ -274,14 +274,6 @@ Suggestions:
 
         res.json({ evaluation: result });
 
-Suggestions:
-- ...
-`;
-
-        const result = await callGemini(prompt, imagesBase64, pdfsBase64);
-
-        res.json({ evaluation: result });
-
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
